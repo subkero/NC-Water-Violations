@@ -8,34 +8,35 @@ import map_builders as MB
 #Step 1) -- Get violations data
 master_table = pd.DataFrame() #creates a new dataframe that's empty
 START_WSYS_NUM=3500 # Can potentially start from 1
-END_WSYS_NUM=3505   # At last check ends past 120000
+END_WSYS_NUM=3505  # At last check ends past 23900
 
 for x in range (START_WSYS_NUM, END_WSYS_NUM):
     url=('https://www.pwss.enr.state.nc.us/NCDWW2/JSP/Violations.'
      'jsp?tinwsys_is_number={}&tinwsys_st_code=NC'.format(x))
-
     wsDetail={}
-    
-    #Create a handle, page, to handle the contents of the website
-    page = requests.get(url)
-    tables = pd.read_html(page.text)
-    table = tables[4]
-    table.columns = table.columns.droplevel(0)
-    
-    # parse table 2 values into a dictionary
-    for row in tables[2].iterrows():
-
-        wsDetail[row[1][0]]=[row[1][1]]*(tables[4].shape[0]) # values table 4's 
-        wsDetail[row[1][2]]=[row[1][3]]*(tables[4].shape[0])# length's times.
+    try:
+        #Create a handle, page, to handle the contents of the website
+        page = requests.get(url, timeout=25)
+        tables = pd.read_html(page.text)
+        table = tables[4]
+        table.columns = table.columns.droplevel(0)
         
-    dftable1=pd.DataFrame(wsDetail)
-    dftable2 = pd.concat([table, dftable1], axis=1)
+        # parse table 2 values into a dictionary
+        for row in tables[2].iterrows():
     
-    master_table=master_table.append(dftable2)
-
+            wsDetail[row[1][0]]=[row[1][1]]*(tables[4].shape[0]) # values table 4's 
+            wsDetail[row[1][2]]=[row[1][3]]*(tables[4].shape[0])# length's times.
+            
+        dftable1=pd.DataFrame(wsDetail)
+        dftable2 = pd.concat([table, dftable1], axis=1)
+        
+        master_table=master_table.append(dftable2)
+    except:
+        pass
+print('crawling complete')
 master_table=master_table[(~master_table['Violation Type Name'].str.contains('ROUTINE|MONTHLY|YEARLY')
                            ) | (master_table['Return To Compliance(Y=Yes; N=No)'].eq('N'))] 
-    
+master_table.to_csv('filteredMasterTable.csv',sep=',')    
 """
 Once we have the Violatins data, the 2 types of maps require different types of additional data.
 Choropleth maps require: i) Population numbers for each County  ii) fips codes iii) Violations counts for 
@@ -60,11 +61,11 @@ df_viols_pivot=df_viols.pivot_table('ViolationNo.', index=['Principal County Ser
 df_viols_pivot=df_viols_pivot.reset_index()  
 
 #iv) -- Produce 2 choropleth maps
-#MB.choropl_viols(values=df_viols_pivot['ViolationNo.'], fips=df_viols_pivot['fips_county'],
-#                 leg='Violations by County')
+MB.choropl_viols(values=df_viols_pivot['ViolationNo.'], fips=df_viols_pivot['fips_county'],
+                 leg='Violations by County')
 values4=(df_viols_pivot['ViolationNo.'].astype(int)*1000).div(df_viols_pivot['POP'].astype(int),fill_value=0)
-#MB.choropl_viols(values4, fips=df_viols_pivot['fips_county'].tolist(),
-#              leg='Violations per 1000 residents')
+MB.choropl_viols(values4, fips=df_viols_pivot['fips_county'].tolist(),
+              leg='Violations per 1000 residents')
 
 """
 ...while  Bubble maps require: a) Latitude and Longitude data b) Populations from incorporated cities,
@@ -79,7 +80,6 @@ this main file, in order to reduce clutter.
 
 df_spots=CG.lat_long_getter(df_spots) 
 df_spots=df_spots.drop_duplicates(['latitude','longitude'])
-df_spots.to_csv('final_TKD_gooleLatsLongs10pm.csv',sep=',')
 
 # b) Get Population of cities, towns, villages, townships from Census APIs and re-merge
 incorp_pop_tables, incorp_pop_dict=PG.census_pop_adder()
@@ -100,6 +100,6 @@ df_viols_BubPivot=df_viols_bubble.pivot_table('ViolationNo.', index=['Principal 
 df_viols_BubPivot=df_viols_BubPivot.reset_index()  
 
 # d) -- Produce 2 bubble maps
-#MB.bubble_mapper(df_viols_BubPivot)
+MB.bubble_mapper(df_viols_BubPivot)
 MB.bubble_mapper(df_viols_BubPivot,raw_count_map=False)
            
