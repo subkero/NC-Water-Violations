@@ -24,6 +24,6 @@ $> pip install Requirements.txt
 <br>
 This app also queries the census api which requires a (free) access key.
 
- <h4>License and author info<h4>
+ <h4>License and author info</h4>
 Code written by Keron Subero and falls under General Public License -- GPLv3 <https://www.gnu.org/licenses/gpl-3.0.en.html> (so feel free to modify and use as you like under these libearal guidelines). Any questions please message me on LinkedIn.
 
